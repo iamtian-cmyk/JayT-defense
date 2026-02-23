@@ -58,7 +58,7 @@ interface Battery extends Entity {
   recoil: number;
 }
 
-const WIN_SCORE = 650;
+const WIN_SCORE = 900;
 const ENEMY_SCORE = 30;
 const EXPLOSION_SPEED = 1.5;
 const INTERCEPTOR_SPEED = 0.02;
@@ -113,9 +113,20 @@ export default function App() {
   const [score, setScore] = useState(0);
   const [muted, setMuted] = useState(false);
   
+  const isPausedRef = useRef(false);
+  const scoreRef = useRef(0);
+  const gameStateRef = useRef<'menu' | 'playing' | 'won' | 'lost'>('menu');
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<number>(null);
+
+  // Sync refs with state
+  useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { 
+    scoreRef.current = score; 
+  }, [score]);
+  useEffect(() => { gameStateRef.current = gameState; }, [gameState]);
   
   // Game Entities Refs
   const enemiesRef = useRef<EnemyMissile[]>([]);
@@ -187,11 +198,7 @@ export default function App() {
   // --- Game Loop ---
 
   const update = (time: number) => {
-    if (gameState !== 'playing' || isPaused) {
-      if (isPaused) {
-        lastTimeRef.current = time;
-        requestRef.current = requestAnimationFrame(update);
-      }
+    if (gameStateRef.current !== 'playing' || isPausedRef.current) {
       return;
     }
     
@@ -204,7 +211,7 @@ export default function App() {
 
     // 1. Spawn Enemies
     spawnTimerRef.current += deltaTime;
-    const spawnRate = Math.max(1000, 3500 - (score / 100) * 250);
+    const spawnRate = Math.max(1000, 3500 - (scoreRef.current / 100) * 250);
     if (spawnTimerRef.current > spawnRate) {
       spawnTimerRef.current = 0;
       const startX = Math.random() * width;
@@ -263,12 +270,16 @@ export default function App() {
       inter.y = inter.startY + (inter.targetY - inter.startY) * inter.progress;
 
       if (inter.progress >= 1) {
+        const destroyedCount = batteriesRef.current.filter(b => b.destroyed).length;
+        // Reduce explosion radius as batteries are lost (50 -> 40 -> 30)
+        const currentMaxRadius = Math.max(30, 50 - destroyedCount * 10);
+        
         explosionsRef.current.push({
           id: `exp-${inter.id}`,
           x: inter.targetX,
           y: inter.targetY,
           radius: 0,
-          maxRadius: 50,
+          maxRadius: currentMaxRadius,
           expanding: true,
           life: 1
         });
@@ -295,8 +306,14 @@ export default function App() {
         if (dist < exp.radius) {
           // Destroy enemy
           setScore(prev => {
-            const newScore = prev + ENEMY_SCORE;
-            if (newScore >= WIN_SCORE) setGameState('won');
+            const destroyedCount = batteriesRef.current.filter(b => b.destroyed).length;
+            // Reduce score per kill as batteries are lost (30 -> 20 -> 10)
+            const currentEnemyScore = Math.max(10, ENEMY_SCORE - destroyedCount * 10);
+            const newScore = prev + currentEnemyScore;
+            if (newScore >= WIN_SCORE) {
+              setGameState('won');
+              gameStateRef.current = 'won';
+            }
             return newScore;
           });
           enemiesRef.current.splice(eIndex, 1);
@@ -323,6 +340,7 @@ export default function App() {
     // 6. Check Game Over
     if (batteriesRef.current.every(b => b.destroyed)) {
       setGameState('lost');
+      gameStateRef.current = 'lost';
     }
 
     draw(time);
@@ -590,19 +608,30 @@ export default function App() {
     });
 
     if (nearestBat) {
+      const destroyedCount = batteriesRef.current.filter(b => b.destroyed).length;
+      const burstCount = destroyedCount > 0 ? 3 : 1;
+      
+      // Deduct ammo once for the burst
       nearestBat.ammo -= 1;
       nearestBat.recoil = 1; // Trigger recoil
-      interceptorsRef.current.push({
-        id: Math.random().toString(36).substr(2, 9),
-        startX: nearestBat.x,
-        startY: nearestBat.y - 20,
-        x: nearestBat.x,
-        y: nearestBat.y - 20,
-        targetX: x,
-        targetY: y,
-        progress: 0,
-        speed: INTERCEPTOR_SPEED
-      });
+      
+      for (let i = 0; i < burstCount; i++) {
+        // Add slight spread if burst
+        const offsetX = burstCount > 1 ? (i - 1) * 30 : 0;
+        const offsetY = burstCount > 1 ? (Math.abs(i - 1)) * 10 : 0;
+
+        interceptorsRef.current.push({
+          id: Math.random().toString(36).substr(2, 9),
+          startX: nearestBat.x,
+          startY: nearestBat.y - 20,
+          x: nearestBat.x,
+          y: nearestBat.y - 20,
+          targetX: x + offsetX,
+          targetY: y + offsetY,
+          progress: 0,
+          speed: INTERCEPTOR_SPEED
+        });
+      }
     }
   };
 
@@ -625,7 +654,7 @@ export default function App() {
   }, [initGame]);
 
   useEffect(() => {
-    if (gameState === 'playing') {
+    if (gameState === 'playing' && !isPaused) {
       lastTimeRef.current = performance.now();
       requestRef.current = requestAnimationFrame(update);
     } else {
@@ -634,7 +663,7 @@ export default function App() {
     return () => {
       if (requestRef.current) cancelAnimationFrame(requestRef.current);
     };
-  }, [gameState]);
+  }, [gameState, isPaused]);
 
   // --- UI Components ---
 
