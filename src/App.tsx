@@ -58,7 +58,7 @@ interface Battery extends Entity {
   recoil: number;
 }
 
-const WIN_SCORE = 900;
+const WIN_SCORE = 650;
 const ENEMY_SCORE = 30;
 const EXPLOSION_SPEED = 1.5;
 const INTERCEPTOR_SPEED = 0.02;
