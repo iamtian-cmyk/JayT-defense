@@ -60,7 +60,7 @@ interface Battery extends Entity {
 
 const WIN_SCORE = 650;
 const ENEMY_SCORE = 30;
-const EXPLOSION_SPEED = 1.5;
+const EXPLOSION_SPEED = 2.0;
 const INTERCEPTOR_SPEED = 0.02;
 const ENEMY_SPEED_MIN = 0.0011;
 const ENEMY_SPEED_MAX = 0.0011;
@@ -164,9 +164,9 @@ export default function App() {
 
     // Init Batteries
     batteriesRef.current = [
-      { id: 'bat-left', x: 40, y: height - 30, destroyed: false, ammo: 30, maxAmmo: 30, recoil: 0 },
-      { id: 'bat-mid', x: width / 2, y: height - 30, destroyed: false, ammo: 60, maxAmmo: 60, recoil: 0 },
-      { id: 'bat-right', x: width - 40, y: height - 30, destroyed: false, ammo: 30, maxAmmo: 30, recoil: 0 },
+      { id: 'bat-left', x: 40, y: height - 30, destroyed: false, ammo: 20, maxAmmo: 20, recoil: 0 },
+      { id: 'bat-mid', x: width / 2, y: height - 30, destroyed: false, ammo: 50, maxAmmo: 50, recoil: 0 },
+      { id: 'bat-right', x: width - 40, y: height - 30, destroyed: false, ammo: 20, maxAmmo: 20, recoil: 0 },
     ];
 
     enemiesRef.current = [];
@@ -248,7 +248,7 @@ export default function App() {
           x: enemy.targetX,
           y: enemy.targetY,
           radius: 0,
-          maxRadius: 40,
+          maxRadius: 60,
           expanding: true,
           life: 1
         });
@@ -271,8 +271,8 @@ export default function App() {
 
       if (inter.progress >= 1) {
         const destroyedCount = batteriesRef.current.filter(b => b.destroyed).length;
-        // Reduce explosion radius as batteries are lost (50 -> 40 -> 30)
-        const currentMaxRadius = Math.max(30, 50 - destroyedCount * 10);
+        // Reduce explosion radius as batteries are lost (80 -> 65 -> 50)
+        const currentMaxRadius = Math.max(50, 80 - destroyedCount * 15);
         
         explosionsRef.current.push({
           id: `exp-${inter.id}`,
@@ -323,7 +323,7 @@ export default function App() {
             x: enemy.x,
             y: enemy.y,
             radius: 5,
-            maxRadius: 20,
+            maxRadius: 35,
             expanding: true,
             life: 0.5
           });
